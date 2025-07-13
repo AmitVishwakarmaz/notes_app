@@ -1,111 +1,106 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-
-import 'login_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../services/auth_service.dart';
 import 'home_screen.dart';
+import 'login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
-
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  _SignupScreenState createState() => _SignupScreenState();
 }
 
 class _SignupScreenState extends State<SignupScreen> {
+  final AuthService _authService = AuthService();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
-
-  String? _emailError;
-  String? _passwordError;
-  String? _confirmPasswordError;
-
   final Color primaryColor = const Color(0xFF7CBA3B);
-
-  void _showSnackBar(String message, [Color? bgColor]) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, style: GoogleFonts.roboto(color: Colors.white)),
-        backgroundColor: bgColor ?? Colors.redAccent,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
+  bool _isLoading = false;
 
   void _signup() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-    final confirmPassword = _confirmPasswordController.text;
-
-    setState(() {
-      _emailError = _passwordError = _confirmPasswordError = null;
-    });
-
-    if (email.isEmpty) {
-      setState(() => _emailError = 'Email cannot be empty');
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Passwords do not match')),
+      );
       return;
     }
-
-    if (password.length < 6) {
-      setState(() => _passwordError = 'Password must be at least 6 characters');
-      return;
-    }
-
-    if (password != confirmPassword) {
-      setState(() => _confirmPasswordError = 'Passwords do not match');
-      return;
-    }
-
+    setState(() => _isLoading = true);
     try {
-      await _auth.createUserWithEmailAndPassword(
-          email: email, password: password);
-      _showSnackBar('Signup successful', Colors.green);
-      Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (_) => HomeScreen()));
+      User? user = await _authService.createUserWithEmailAndPassword(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'email': user.email,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomeScreen()),
+        );
+      }
     } catch (e) {
-      _showSnackBar('Signup failed: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Signup failed: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _signUpWithGoogle() async {
+  void _signupWithGoogle() async {
+    setState(() => _isLoading = true);
     try {
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return; // User cancelled
+      User? user =
+          await _authService.signInWithGoogle(forceAccountSelection: true);
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      if (user != null) {
+        DocumentSnapshot doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
 
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
+        if (!doc.exists) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set({
+            'email': user.email,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
 
-      await _auth.signInWithCredential(credential);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomeScreen()),
-      );
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => HomeScreen()),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Account already exists. Please sign in.'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+          await _authService.signOut();
+        }
+      }
     } catch (e) {
-      _showSnackBar('Google Sign-Up failed: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Google Signup failed: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
   Widget _textField({
     required String label,
     required TextEditingController controller,
-    bool isPassword = false,
-    bool isConfirm = false,
     IconData? icon,
-    String? errorText,
-    required VoidCallback toggleVisibility,
     bool obscure = false,
   }) {
     return Column(
@@ -116,18 +111,11 @@ class _SignupScreenState extends State<SignupScreen> {
           obscureText: obscure,
           decoration: InputDecoration(
             labelText: label,
-            prefixIcon: Icon(icon, size: 20),
-            suffixIcon: isPassword || isConfirm
-                ? IconButton(
-                    icon:
-                        Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                    onPressed: toggleVisibility,
-                  )
-                : null,
+            prefixIcon: Icon(icon, color: Colors.grey[400]),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            errorText: errorText,
             filled: true,
             fillColor: const Color(0xFF121212),
+            labelStyle: const TextStyle(color: Colors.grey),
           ),
           style: const TextStyle(color: Colors.white),
         ),
@@ -146,54 +134,43 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Column(
             children: [
               const SizedBox(height: 40),
-              Text('Notes App',
+              Text('Create Account',
                   style: GoogleFonts.roboto(
                       fontSize: 30,
                       color: Colors.white,
                       fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
-              Text('Create an account to begin',
+              Text('Sign up to get started',
                   style: GoogleFonts.roboto(color: Colors.grey[400])),
               const SizedBox(height: 40),
               _textField(
                 label: 'Email',
                 controller: _emailController,
                 icon: Icons.email,
-                errorText: _emailError,
-                toggleVisibility: () {},
               ),
               _textField(
                 label: 'Password',
                 controller: _passwordController,
-                isPassword: true,
-                obscure: _obscurePassword,
                 icon: Icons.lock,
-                errorText: _passwordError,
-                toggleVisibility: () {
-                  setState(() => _obscurePassword = !_obscurePassword);
-                },
+                obscure: true,
               ),
               _textField(
                 label: 'Confirm Password',
                 controller: _confirmPasswordController,
-                isConfirm: true,
-                obscure: _obscureConfirmPassword,
-                icon: Icons.lock,
-                errorText: _confirmPasswordError,
-                toggleVisibility: () {
-                  setState(
-                      () => _obscureConfirmPassword = !_obscureConfirmPassword);
-                },
+                icon: Icons.lock_outline,
+                obscure: true,
               ),
               ElevatedButton(
-                onPressed: _signup,
+                onPressed: _isLoading ? null : _signup,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                   minimumSize: const Size.fromHeight(50),
                 ),
-                child: Text('Sign Up', style: GoogleFonts.roboto(fontSize: 16)),
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text('Sign Up', style: GoogleFonts.roboto(fontSize: 16)),
               ),
               const SizedBox(height: 24),
               Row(
@@ -209,36 +186,28 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: _signUpWithGoogle,
+                onPressed: _isLoading ? null : _signupWithGoogle,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black,
                   minimumSize: const Size.fromHeight(50),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                      borderRadius: BorderRadius.circular(10)),
                 ),
-                icon: Image.asset(
-                  'assets/images/google.png',
-                  height: 24,
-                ),
-                label: Text(
-                  'Continue with Google',
-                  style: GoogleFonts.roboto(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                icon: Image.asset('assets/images/google.png', height: 24),
+                label: Text('Continue with Google',
+                    style: GoogleFonts.roboto(
+                        fontSize: 16, fontWeight: FontWeight.w500)),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               TextButton(
                 onPressed: () {
-                  Navigator.push(context,
+                  Navigator.pushReplacement(context,
                       MaterialPageRoute(builder: (_) => const SigninScreen()));
                 },
                 child: Text('Already have an account? Sign in',
                     style: GoogleFonts.roboto(color: primaryColor)),
-              )
+              ),
             ],
           ),
         ),

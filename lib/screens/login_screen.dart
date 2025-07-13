@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'signup_screen.dart';
 
@@ -10,173 +10,98 @@ class SigninScreen extends StatefulWidget {
   const SigninScreen({super.key});
 
   @override
-  State<SigninScreen> createState() => _SigninScreenState();
+  _SigninScreenState createState() => _SigninScreenState();
 }
 
 class _SigninScreenState extends State<SigninScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  String? _emailError;
-  String? _passwordError;
+  final AuthService _authService = AuthService();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   final Color primaryColor = const Color(0xFF7CBA3B);
 
-  // Email/Password Login
-  void _login() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
+  bool _isLoading = false;
 
-    setState(() {
-      _emailError = _passwordError = null;
-    });
-
-    if (email.isEmpty) {
-      setState(() => _emailError = 'Email required');
-      return;
-    }
-    if (password.isEmpty) {
-      setState(() => _passwordError = 'Password required');
-      return;
-    }
-
+  void _signin() async {
+    setState(() => _isLoading = true);
     try {
-      final userCredential = await _auth.signInWithEmailAndPassword(
-          email: email, password: password);
-      final user = userCredential.user;
-      if (user == null) throw Exception("User not found after sign-in");
-
-      // Check if user document exists in Firestore
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      if (userDoc.exists) {
-        // User exists, go to HomeScreen
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => HomeScreen()),
-        );
-      } else {
-        // No Firestore document, sign out and redirect to SignupScreen
-        await _auth.signOut();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('No account found. Please sign up first.'),
-            backgroundColor: Colors.redAccent,
-            action: SnackBarAction(
-              label: 'Sign Up',
-              textColor: Colors.white,
-              onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SignupScreen()),
-                );
-              },
+      User? user = await _authService.loginUserWithEmailAndPassword(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+      if (user != null) {
+        DocumentSnapshot doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        if (doc.exists) {
+          Navigator.pushReplacement(
+              context, MaterialPageRoute(builder: (_) => HomeScreen()));
+        } else {
+          await _authService.signOut();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('No account found. Please sign up.'),
+              backgroundColor: Colors.redAccent,
             ),
-          ),
-        );
-      }
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-                'No account found with this email. Please sign up first.'),
-            backgroundColor: Colors.redAccent,
-            action: SnackBarAction(
-              label: 'Sign Up',
-              textColor: Colors.white,
-              onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SignupScreen()),
-                );
-              },
-            ),
-          ),
-        );
-      } else if (e.code == 'wrong-password') {
-        setState(() => _passwordError = 'Incorrect password');
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Login failed: ${e.message}'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+          );
+          Navigator.pushReplacement(
+              context, MaterialPageRoute(builder: (_) => SignupScreen()));
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('An unexpected error occurred: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
+        SnackBar(content: Text('Sign-in failed: $e')),
       );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
-  // Google Sign-In
-  Future<void> _signInWithGoogle() async {
+  void _signinWithGoogle() async {
+    setState(() => _isLoading = true);
     try {
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return; // User cancelled
+      User? user = await _authService.signInWithGoogle();
+      if (user != null) {
+        // ✅ Double-check Firestore user profile exists
+        DocumentSnapshot doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final UserCredential userCredential =
-          await _auth.signInWithCredential(credential);
-
-      final user = userCredential.user;
-      if (user == null) throw Exception("User not found after sign-in");
-
-      // Check if user document exists in Firestore
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      if (userDoc.exists) {
-        // User exists, go to HomeScreen
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => HomeScreen()),
-        );
+        if (doc.exists) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => HomeScreen()),
+          );
+        } else {
+          await _authService.signOut();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('No account found. Please sign up.'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+          Navigator.pushReplacement(
+              context, MaterialPageRoute(builder: (_) => SignupScreen()));
+        }
       } else {
-        // No Firestore document, sign out and redirect to SignupScreen
-        await _auth.signOut();
-        await GoogleSignIn().signOut();
+        // ❗ Google email not registered — redirect
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('No account found. Please sign up first.'),
+            content: Text(
+                'No account found with this Google email. Please sign up.'),
             backgroundColor: Colors.redAccent,
-            action: SnackBarAction(
-              label: 'Sign Up',
-              textColor: Colors.white,
-              onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SignupScreen()),
-                );
-              },
-            ),
           ),
         );
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => SignupScreen()));
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Google Sign-In failed: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
+        SnackBar(content: Text('Google Sign-in failed: $e')),
       );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -185,7 +110,6 @@ class _SigninScreenState extends State<SigninScreen> {
     required TextEditingController controller,
     IconData? icon,
     bool obscure = false,
-    String? errorText,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -195,11 +119,11 @@ class _SigninScreenState extends State<SigninScreen> {
           obscureText: obscure,
           decoration: InputDecoration(
             labelText: label,
-            prefixIcon: Icon(icon),
-            errorText: errorText,
+            prefixIcon: Icon(icon, color: Colors.grey[400]),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             filled: true,
             fillColor: const Color(0xFF121212),
+            labelStyle: const TextStyle(color: Colors.grey),
           ),
           style: const TextStyle(color: Colors.white),
         ),
@@ -218,45 +142,37 @@ class _SigninScreenState extends State<SigninScreen> {
           child: Column(
             children: [
               const SizedBox(height: 40),
-              Text(
-                'Welcome Back',
-                style: GoogleFonts.roboto(
-                  fontSize: 30,
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              Text('Welcome Back',
+                  style: GoogleFonts.roboto(
+                      fontSize: 30,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
-              Text(
-                'Sign in to your account',
-                style: GoogleFonts.roboto(color: Colors.grey[400]),
-              ),
+              Text('Sign in to your account',
+                  style: GoogleFonts.roboto(color: Colors.grey[400])),
               const SizedBox(height: 40),
               _textField(
                 label: 'Email',
                 controller: _emailController,
                 icon: Icons.email,
-                errorText: _emailError,
               ),
               _textField(
                 label: 'Password',
                 controller: _passwordController,
                 icon: Icons.lock,
                 obscure: true,
-                errorText: _passwordError,
               ),
               ElevatedButton(
-                onPressed: _login,
+                onPressed: _isLoading ? null : _signin,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                   minimumSize: const Size.fromHeight(50),
                 ),
-                child: Text(
-                  'Sign In',
-                  style: GoogleFonts.roboto(fontSize: 16),
-                ),
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text('Sign In', style: GoogleFonts.roboto(fontSize: 16)),
               ),
               const SizedBox(height: 24),
               Row(
@@ -272,40 +188,28 @@ class _SigninScreenState extends State<SigninScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: _signInWithGoogle,
+                onPressed: _isLoading ? null : _signinWithGoogle,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black,
                   minimumSize: const Size.fromHeight(50),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                      borderRadius: BorderRadius.circular(10)),
                 ),
-                icon: Image.asset(
-                  'assets/images/google.png', // Place this in your assets folder
-                  height: 24,
-                ),
-                label: Text(
-                  'Continue with Google',
-                  style: GoogleFonts.roboto(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                icon: Image.asset('assets/images/google.png', height: 24),
+                label: Text('Continue with Google',
+                    style: GoogleFonts.roboto(
+                        fontSize: 16, fontWeight: FontWeight.w500)),
               ),
               const SizedBox(height: 24),
               TextButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SignupScreen()),
-                  );
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => SignupScreen()));
                 },
-                child: Text(
-                  'Don\'t have an account? Sign up',
-                  style: GoogleFonts.roboto(color: primaryColor),
-                ),
-              ),
+                child: Text('Don\'t have an account? Sign up',
+                    style: GoogleFonts.roboto(color: primaryColor)),
+              )
             ],
           ),
         ),

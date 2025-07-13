@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'screens/signup_screen.dart';
 import 'theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
@@ -48,16 +49,15 @@ class MyApp extends StatelessWidget {
                   return const Scaffold(
                       body: Center(child: CircularProgressIndicator()));
                 } else if (userSnapshot.hasData && userSnapshot.data!.exists) {
-                  return HomeScreen(); // ✅ Authenticated and account exists
+                  return HomeScreen();
                 } else {
-                  FirebaseAuth.instance
-                      .signOut(); // ❌ No Firestore doc, force logout
-                  return const SigninScreen();
+                  FirebaseAuth.instance.signOut();
+                  return SignupScreen(); // Changed to SignupScreen
                 }
               },
             );
           } else {
-            return const SigninScreen();
+            return SigninScreen();
           }
         },
       ),

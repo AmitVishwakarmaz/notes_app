@@ -1,16 +1,31 @@
-# notes_app
+# 📝 Notes App (Flutter + Firebase)
 
-A new Flutter project.
+A simple, elegant note-taking app built with **Flutter**. This app allows users to **sign up/sign in using email or Google**, create and view notes, and persist data locally using `shared_preferences`.
 
-## Getting Started
+## ✨ Features
 
-This project is a starting point for a Flutter application.
+- ✅ Firebase Authentication (Email/Password & Google Sign-In)
+- ✅ Add, View Notes
+- ✅ Local persistence using `shared_preferences`
+- ✅ Clean and responsive UI
+- ✅ Input validations
+- ✅ Theming with Material 3 and custom color scheme
 
-A few resources to get you started if this is your first Flutter project:
+---
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## 🎯 Tech Stack
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- **Flutter** (Dart)
+- **Firebase Auth** (Email & Google Sign-In)
+- **Shared Preferences** for local storage
+- **Google Fonts** for styling
+
+---
+
+## 🔧 Setup Instructions
+
+### 1. Clone the Repo
+
+```bash
+git clone https://github.com/AmitVishwakarmaz/notes_app.git
+cd notes_app
