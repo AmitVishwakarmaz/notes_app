@@ -201,25 +201,14 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
                     ),
                   Row(
                     children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _pickFile,
-                          icon: const Icon(Icons.attach_file),
-                          label: const Text("Attach File"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1C1C1C),
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: _pickImage,
-                          icon: const Icon(Icons.camera_alt),
+                            icon: const Icon(Icons.camera_alt, color: Color(0xFF7CBA3B)),
                           label: const Text("Capture Image"),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1C1C1C),
+                            backgroundColor: const Color.fromARGB(255, 0, 0, 0),
                             foregroundColor: Colors.white,
                           ),
                         ),

@@ -5,6 +5,7 @@ import '../models/note.dart';
 import '../services/note_service.dart';
 import 'add_note_screen.dart';
 import '../services/auth_service.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -19,6 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final Color primaryColor = const Color(0xFF7CBA3B);
   final List<String> _categories = [
     'All',
+    'Starred',
     'Work',
     'Personal',
     'Study',
@@ -64,8 +66,11 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _filteredNotes = _allNotes.where((note) {
         final matchesTitle = note.title.toLowerCase().contains(query);
-        final matchesCategory =
-            _selectedCategory == 'All' || note.category == _selectedCategory;
+        final matchesCategory = _selectedCategory == 'All'
+            ? true
+            : _selectedCategory == 'Starred'
+                ? note.isStarred
+                : note.category == _selectedCategory;
         return matchesTitle && matchesCategory;
       }).toList();
     });
@@ -193,7 +198,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _logout() async {
     await _authService.signOut();
-    Navigator.pop(context);
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => SigninScreen()),
+      (route) => false,
+    );
   }
 
   void _toggleStar(Note note) async {
