@@ -28,22 +28,18 @@ class _SigninScreenState extends State<SigninScreen> {
         _emailController.text.trim(),
         _passwordController.text,
       );
-      if (user != null) {
-        DocumentSnapshot doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-        if (doc.exists) {
-          Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (_) => HomeScreen()));
-        } else {
-          await _authService.signOut();
-          Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (_) => SignupScreen()));
-        }
-      }
+
+      // ✅ Always go to HomeScreen, even if Firestore doc doesn't exist
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => HomeScreen()),
+      );
     } catch (e) {
-      // Removed SnackBar
+      // ✅ Still redirecting to HomeScreen even on error
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => HomeScreen()),
+      );
     } finally {
       setState(() => _isLoading = false);
     }
@@ -53,28 +49,16 @@ class _SigninScreenState extends State<SigninScreen> {
     setState(() => _isLoading = true);
     try {
       User? user = await _authService.signInWithGoogle();
-      if (user != null) {
-        DocumentSnapshot doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
 
-        if (doc.exists) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => HomeScreen()),
-          );
-        } else {
-          await _authService.signOut();
-          Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (_) => SignupScreen()));
-        }
-      } else {
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => SignupScreen()));
-      }
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => HomeScreen()),
+      );
     } catch (e) {
-      // Removed SnackBar
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => HomeScreen()),
+      );
     } finally {
       setState(() => _isLoading = false);
     }
