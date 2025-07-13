@@ -1,0 +1,37 @@
+# Flutter/Dart/Pub related
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+
+# Build outputs
+build/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/ServiceDefinitions.json
+macos/Flutter/ephemeral/
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
+*.apk
+*.ipa
+
+# IDE related
+.idea/
+.vscode/
+*.iml
+
+# Firebase & Keys
+*.keystore
+android/key.properties
+
+# OS generated
+.DS_Store
+*.log
+
+# Environment
+.env
+
+# Flutter specific
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-versions
