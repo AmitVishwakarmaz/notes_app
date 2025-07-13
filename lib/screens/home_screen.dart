@@ -199,13 +199,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _logout() async {
     try {
-      await _authService.signOut(); // ✅ Uses your combined sign-out method
+      await FirebaseAuth.instance
+          .signOut(); // or use _authService.signOut() if needed
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const SigninScreen()),
+        (route) => false,
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Logout failed: ${e.toString()}"),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text("Error logging out: $e")),
       );
     }
   }

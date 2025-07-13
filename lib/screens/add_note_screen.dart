@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -69,16 +68,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
 
     await _noteService.saveNotes(notes);
     Navigator.pop(context, true);
-  }
-
-  Future<void> _pickFile() async {
-    final status = await Permission.storage.request();
-    if (status.isGranted) {
-      FilePickerResult? result = await FilePicker.platform.pickFiles();
-      if (result != null && result.files.single.path != null) {
-        setState(() => _attachedFilePath = result.files.single.path!);
-      }
-    }
   }
 
   Future<void> _pickImage() async {

@@ -1,6 +1,151 @@
+// import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:firebase_ui_auth/firebase_ui_auth.dart';
+// import 'package:flutter/material.dart';
+// import 'package:google_fonts/google_fonts.dart';
+// import 'home_screen.dart';
+// import 'forgot_password_screen.dart';
+// import '../services/auth_service.dart';
+
+// class SigninScreen extends StatefulWidget {
+//   const SigninScreen({super.key});
+
+//   @override
+//   _SigninScreenState createState() => _SigninScreenState();
+// }
+
+// class _SigninScreenState extends State<SigninScreen> {
+//   final TextEditingController emailController = TextEditingController();
+//   final TextEditingController passwordController = TextEditingController();
+//   bool _obscurePassword = true;
+
+//   void _showSnackBar(String message) {
+//     ScaffoldMessenger.of(context).showSnackBar(
+//       SnackBar(
+//         content: Text(message, style: GoogleFonts.roboto()),
+//         backgroundColor: Colors.redAccent,
+//       ),
+//     );
+//   }
+
+//   Future<void> signIn(BuildContext context) async {
+//     try {
+//       final user = await AuthService().loginUserWithEmailAndPassword(
+//         emailController.text.trim(),
+//         passwordController.text.trim(),
+//       );
+//       if (user != null) {
+//         Navigator.pushReplacement(
+//           context,
+//           MaterialPageRoute(builder: (_) => HomeScreen()),
+//         );
+//       }
+//     } catch (e) {
+//       _showSnackBar(e.toString());
+//     }
+//   }
+
+//   Future<void> signInWithGoogle(BuildContext context) async {
+//     try {
+//       final user = await AuthService().signInWithGoogle();
+//       if (user != null) {
+//         Navigator.pushReplacement(
+//           context,
+//           MaterialPageRoute(builder: (_) => HomeScreen()),
+//         );
+//       }
+//     } catch (e) {
+//       _showSnackBar(e.toString());
+//     }
+//   }
+
+//   Widget _buildTextField({
+//     required String label,
+//     required TextEditingController controller,
+//     bool obscureText = false,
+//     IconData? prefixIcon,
+//     Widget? suffixIcon,
+//   }) {
+//     return TextFormField(
+//       controller: controller,
+//       obscureText: obscureText,
+//       style: TextStyle(color: Colors.white),
+//       decoration: InputDecoration(
+//         labelText: label,
+//         labelStyle: TextStyle(color: Colors.grey[400]),
+//         prefixIcon: prefixIcon != null
+//             ? Icon(prefixIcon, color: Colors.grey[400])
+//             : null,
+//         suffixIcon: suffixIcon,
+//         filled: true,
+//         fillColor: const Color(0xFF1E1E1E),
+//         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+//       ),
+//     );
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       backgroundColor: Colors.black,
+//       body: SafeArea(
+//         child: Padding(
+//           padding: const EdgeInsets.all(24.0),
+//           child: Column(
+//             mainAxisAlignment: MainAxisAlignment.center,
+//             children: [
+//               Text("Sign In",
+//                   style: GoogleFonts.roboto(fontSize: 28, color: Colors.white)),
+//               const SizedBox(height: 30),
+//               _buildTextField(
+//                 label: 'Email',
+//                 controller: emailController,
+//                 prefixIcon: Icons.email,
+//               ),
+//               const SizedBox(height: 16),
+//               _buildTextField(
+//                 label: 'Password',
+//                 controller: passwordController,
+//                 obscureText: _obscurePassword,
+//                 prefixIcon: Icons.lock,
+//                 suffixIcon: IconButton(
+//                   icon: Icon(
+//                     _obscurePassword ? Icons.visibility_off : Icons.visibility,
+//                     color: Colors.grey[400],
+//                   ),
+//                   onPressed: () {
+//                     setState(() => _obscurePassword = !_obscurePassword);
+//                   },
+//                 ),
+//               ),
+//               const SizedBox(height: 16),
+//               ElevatedButton(
+//                 onPressed: () => signIn(context),
+//                 child: const Text("Sign In"),
+//                 style: ElevatedButton.styleFrom(
+//                   backgroundColor: const Color(0xFF7CBA3B),
+//                 ),
+//               ),
+//               const SizedBox(height: 20),
+//               ElevatedButton.icon(
+//                 onPressed: () => signInWithGoogle(context),
+//                 icon: Image.asset('assets/images/google.png', height: 24),
+//                 label: const Text('Continue with Google'),
+//                 style: ElevatedButton.styleFrom(
+//                   backgroundColor: Colors.white,
+//                   foregroundColor: Colors.black,
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
@@ -15,60 +160,99 @@ class SigninScreen extends StatefulWidget {
 
 class _SigninScreenState extends State<SigninScreen> {
   final AuthService _authService = AuthService();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final Color primaryColor = const Color(0xFF7CBA3B);
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
 
+  bool _obscurePassword = true;
   bool _isLoading = false;
 
-  void _signin() async {
+  void _showSnackBar(String message, {Color? color}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: GoogleFonts.roboto()),
+        backgroundColor: color ?? Colors.redAccent,
+      ),
+    );
+  }
+
+  Future<void> _signInWithEmailPassword() async {
     setState(() => _isLoading = true);
     try {
-      User? user = await _authService.loginUserWithEmailAndPassword(
-        _emailController.text.trim(),
-        _passwordController.text,
+      final user = await _authService.loginUserWithEmailAndPassword(
+        emailController.text.trim(),
+        passwordController.text.trim(),
       );
 
-      // ✅ Always go to HomeScreen, even if Firestore doc doesn't exist
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomeScreen()),
-      );
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (doc.exists) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => HomeScreen()),
+          );
+        } else {
+          await _authService.signOut();
+          _showSnackBar('No account found. Please sign up.',
+              color: Colors.green);
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => SignupScreen()),
+          );
+        }
+      }
     } catch (e) {
-      // ✅ Still redirecting to HomeScreen even on error
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomeScreen()),
-      );
+      _showSnackBar('Sign-in failed: $e');
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  void _signinWithGoogle() async {
+  Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
     try {
-      User? user = await _authService.signInWithGoogle();
+      // Sign out to always prompt account selection
+      await _authService.signOutFromGoogle();
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomeScreen()),
-      );
+      final user = await _authService.signInWithGoogle();
+
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (doc.exists) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => HomeScreen()),
+          );
+        } else {
+          await _authService.signOut();
+          _showSnackBar('No account found. Please sign up.',
+              color: Colors.green);
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => SignupScreen()),
+          );
+        }
+      }
     } catch (e) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomeScreen()),
-      );
+      _showSnackBar('Google Sign-in failed: $e');
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  Widget _textField({
+  Widget _buildTextField({
     required String label,
     required TextEditingController controller,
     IconData? icon,
     bool obscure = false,
+    Widget? suffixIcon,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -78,7 +262,9 @@ class _SigninScreenState extends State<SigninScreen> {
           obscureText: obscure,
           decoration: InputDecoration(
             labelText: label,
-            prefixIcon: Icon(icon, color: Colors.grey[400]),
+            prefixIcon:
+                icon != null ? Icon(icon, color: Colors.grey[400]) : null,
+            suffixIcon: suffixIcon,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             filled: true,
             fillColor: const Color(0xFF121212),
@@ -93,6 +279,8 @@ class _SigninScreenState extends State<SigninScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = const Color(0xFF7CBA3B);
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -110,19 +298,28 @@ class _SigninScreenState extends State<SigninScreen> {
               Text('Sign in to your account',
                   style: GoogleFonts.roboto(color: Colors.grey[400])),
               const SizedBox(height: 40),
-              _textField(
+              _buildTextField(
                 label: 'Email',
-                controller: _emailController,
+                controller: emailController,
                 icon: Icons.email,
               ),
-              _textField(
+              _buildTextField(
                 label: 'Password',
-                controller: _passwordController,
+                controller: passwordController,
                 icon: Icons.lock,
-                obscure: true,
+                obscure: _obscurePassword,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.grey[400],
+                  ),
+                  onPressed: () {
+                    setState(() => _obscurePassword = !_obscurePassword);
+                  },
+                ),
               ),
               ElevatedButton(
-                onPressed: _isLoading ? null : _signin,
+                onPressed: _isLoading ? null : _signInWithEmailPassword,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
                   shape: RoundedRectangleBorder(
@@ -147,7 +344,7 @@ class _SigninScreenState extends State<SigninScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: _isLoading ? null : _signinWithGoogle,
+                onPressed: _isLoading ? null : () => _signInWithGoogle(),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black,
@@ -166,8 +363,9 @@ class _SigninScreenState extends State<SigninScreen> {
                   Navigator.push(context,
                       MaterialPageRoute(builder: (_) => SignupScreen()));
                 },
-                child: Text('Don\'t have an account? Sign up',
-                    style: GoogleFonts.roboto(color: primaryColor)),
+                child: Text("Don't have an account? Sign up",
+                    style: GoogleFonts.roboto(
+                        color: primaryColor, fontWeight: FontWeight.w500)),
               )
             ],
           ),

@@ -3,7 +3,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // Create user with email and password
@@ -35,14 +34,14 @@ class AuthService {
     }
   }
 
-  Future<User?> signInWithGoogle({bool forceAccountSelection = true}) async {
+  // Sign in with Google
+  Future<User?> signInWithGoogle() async {
     try {
-      if (forceAccountSelection) {
-        await _googleSignIn.signOut(); // forces account picker
-      }
-
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return null; // user cancelled
+
+      if (googleUser == null) {
+        return null;
+      }
 
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
@@ -52,18 +51,12 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      // Check if already signed up (useful only in Signin screen)
-      final signInMethods =
-          await _auth.fetchSignInMethodsForEmail(googleUser.email);
-
-      // If no method, it’s new user. If method exists, it’s existing.
-      // Let the caller decide what to do.
-
       UserCredential userCredential =
           await _auth.signInWithCredential(credential);
+
       return userCredential.user;
     } catch (e) {
-      throw Exception("Google Sign-In failed: ${e.toString()}");
+      throw Exception(e.toString());
     }
   }
 
@@ -72,7 +65,7 @@ class AuthService {
     try {
       await _auth.signOut();
     } catch (e) {
-      throw Exception("Error signing out from Firebase: ${e.toString()}");
+      throw Exception("Error signing out from Google: ${e.toString()}");
     }
   }
 
@@ -103,4 +96,6 @@ class AuthService {
       throw Exception("Error sending password reset email: ${e.toString()}");
     }
   }
+
+  signInWithEmailAndPassword(String email, String password) {}
 }

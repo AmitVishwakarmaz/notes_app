@@ -1,66 +1,81 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key});
+
   @override
-  _SignupScreenState createState() => _SignupScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
 class _SignupScreenState extends State<SignupScreen> {
   final AuthService _authService = AuthService();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
-
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final Color primaryColor = const Color(0xFF7CBA3B);
+
   bool _isLoading = false;
 
-  void _signup() async {
-    if (_passwordController.text != _confirmPasswordController.text) {
+  Future<void> _signup() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    if (password != confirmPassword) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Passwords do not match')),
+        SnackBar(
+          content: const Text('Passwords do not match'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
       return;
     }
+
     setState(() => _isLoading = true);
+
     try {
-      User? user = await _authService.createUserWithEmailAndPassword(
-        _emailController.text.trim(),
-        _passwordController.text,
+      final User? user = await _authService.createUserWithEmailAndPassword(
+        email,
+        password,
       );
+
       if (user != null) {
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'email': user.email,
           'createdAt': FieldValue.serverTimestamp(),
         });
+
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => HomeScreen()),
+          MaterialPageRoute(builder: (_) => HomeScreen()),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Signup failed: $e')),
+        SnackBar(
+          content: Text('Signup failed: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  void _signupWithGoogle() async {
+  Future<void> _signupWithGoogle() async {
     setState(() => _isLoading = true);
+
     try {
-      User? user =
-          await _authService.signInWithGoogle(forceAccountSelection: true);
+      final User? user = await _authService.signInWithGoogle();
 
       if (user != null) {
-        DocumentSnapshot doc = await FirebaseFirestore.instance
+        final doc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .get();
@@ -76,12 +91,12 @@ class _SignupScreenState extends State<SignupScreen> {
 
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => HomeScreen()),
+            MaterialPageRoute(builder: (_) => HomeScreen()),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Account already exists. Please sign in.'),
+              content: const Text('Account already exists. Please sign in.'),
               backgroundColor: Colors.redAccent,
             ),
           );
@@ -89,6 +104,12 @@ class _SignupScreenState extends State<SignupScreen> {
         }
       }
     } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Google Sign-Up failed: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     } finally {
       setState(() => _isLoading = false);
     }
@@ -184,6 +205,12 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: _isLoading ? null : _signupWithGoogle,
+                icon: Image.asset('assets/images/google.png', height: 24),
+                label: Text(
+                  'Continue with Google',
+                  style: GoogleFonts.roboto(
+                      fontSize: 16, fontWeight: FontWeight.w500),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black,
@@ -191,10 +218,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                 ),
-                icon: Image.asset('assets/images/google.png', height: 24),
-                label: Text('Continue with Google',
-                    style: GoogleFonts.roboto(
-                        fontSize: 16, fontWeight: FontWeight.w500)),
               ),
               const SizedBox(height: 24),
               TextButton(
