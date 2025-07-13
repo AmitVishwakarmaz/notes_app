@@ -15,7 +15,7 @@ A simple, elegant note-taking app built with **Flutter**. This app allows users 
 
 ## 🎯 Tech Stack
 
-- **Flutter** (Dart)
+- **Flutter** (Dart) 
 - **Firebase Auth** (Email & Google Sign-In)
 - **Shared Preferences** for local storage
 - **Google Fonts** for styling
@@ -29,3 +29,4 @@ A simple, elegant note-taking app built with **Flutter**. This app allows users 
 ```bash
 git clone https://github.com/AmitVishwakarmaz/notes_app.git
 cd notes_app
+Flutter 3.27.2
