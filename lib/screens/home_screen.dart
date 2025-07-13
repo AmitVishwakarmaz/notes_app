@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -197,12 +199,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _logout() async {
-    await _authService.signOut();
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => SigninScreen()),
-      (route) => false,
-    );
+    try {
+      await _authService.signOut(); // ✅ Uses your combined sign-out method
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Logout failed: ${e.toString()}"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _toggleStar(Note note) async {

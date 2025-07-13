@@ -38,20 +38,12 @@ class _SigninScreenState extends State<SigninScreen> {
               context, MaterialPageRoute(builder: (_) => HomeScreen()));
         } else {
           await _authService.signOut();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('No account found. Please sign up.'),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
           Navigator.pushReplacement(
               context, MaterialPageRoute(builder: (_) => SignupScreen()));
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sign-in failed: $e')),
-      );
+      // Removed SnackBar
     } finally {
       setState(() => _isLoading = false);
     }
@@ -62,7 +54,6 @@ class _SigninScreenState extends State<SigninScreen> {
     try {
       User? user = await _authService.signInWithGoogle();
       if (user != null) {
-        // ✅ Double-check Firestore user profile exists
         DocumentSnapshot doc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
@@ -75,31 +66,15 @@ class _SigninScreenState extends State<SigninScreen> {
           );
         } else {
           await _authService.signOut();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('No account found. Please sign up.'),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
           Navigator.pushReplacement(
               context, MaterialPageRoute(builder: (_) => SignupScreen()));
         }
       } else {
-        // ❗ Google email not registered — redirect
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'No account found with this Google email. Please sign up.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
         Navigator.pushReplacement(
             context, MaterialPageRoute(builder: (_) => SignupScreen()));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Google Sign-in failed: $e')),
-      );
+      // Removed SnackBar
     } finally {
       setState(() => _isLoading = false);
     }
