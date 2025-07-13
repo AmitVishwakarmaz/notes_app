@@ -3,9 +3,10 @@ class Note {
   final String title;
   final String content;
   final DateTime createdAt;
-  final String? category; // New: Optional category
-  final String? imagePath; // New: Optional image path
-  final String? filePath; // New: Optional file path
+  String? category;
+  bool isStarred;
+  String? imagePath;
+  String? filePath;
 
   Note({
     required this.id,
@@ -13,6 +14,7 @@ class Note {
     required this.content,
     required this.createdAt,
     this.category,
+    this.isStarred = false,
     this.imagePath,
     this.filePath,
   });
@@ -23,6 +25,7 @@ class Note {
         'content': content,
         'createdAt': createdAt.toIso8601String(),
         'category': category,
+        'isStarred': isStarred,
         'imagePath': imagePath,
         'filePath': filePath,
       };
@@ -33,6 +36,7 @@ class Note {
         content: json['content'],
         createdAt: DateTime.parse(json['createdAt']),
         category: json['category'],
+        isStarred: json['isStarred'] ?? false,
         imagePath: json['imagePath'],
         filePath: json['filePath'],
       );

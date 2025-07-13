@@ -1,3 +1,5 @@
+// add_note_screen.dart
+
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -8,8 +10,11 @@ import '../models/note.dart';
 import '../services/note_service.dart';
 
 class AddNoteScreen extends StatefulWidget {
+  final Note? existingNote;
+  const AddNoteScreen({this.existingNote});
+
   @override
-  _AddNoteScreenState createState() => _AddNoteScreenState();
+  State<AddNoteScreen> createState() => _AddNoteScreenState();
 }
 
 class _AddNoteScreenState extends State<AddNoteScreen> {
@@ -26,25 +31,45 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
   final Color primaryColor = const Color(0xFF7CBA3B);
   final List<String> _categories = ['Work', 'Personal', 'Study', 'Others'];
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.existingNote != null) {
+      final note = widget.existingNote!;
+      _titleController.text = note.title;
+      _contentController.text = note.content;
+      _selectedCategory = note.category;
+      if (note.imagePath != null) {
+        _attachedImage = File(note.imagePath!);
+      }
+      _attachedFilePath = note.filePath;
+    }
+  }
+
   void _saveNote() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isSaving = true);
 
-    final newNote = Note(
-      id: Uuid().v4(),
+    final note = Note(
+      id: widget.existingNote?.id ?? const Uuid().v4(),
       title: _titleController.text.trim(),
       content: _contentController.text.trim(),
-      createdAt: DateTime.now(),
+      createdAt: widget.existingNote?.createdAt ?? DateTime.now(),
       category: _selectedCategory,
       imagePath: _attachedImage?.path,
       filePath: _attachedFilePath,
+      isStarred: widget.existingNote?.isStarred ?? false,
     );
 
     final notes = await _noteService.loadNotes();
-    notes.add(newNote);
-    await _noteService.saveNotes(notes);
+    if (widget.existingNote != null) {
+      final index = notes.indexWhere((n) => n.id == note.id);
+      if (index != -1) notes[index] = note;
+    } else {
+      notes.add(note);
+    }
 
+    await _noteService.saveNotes(notes);
     Navigator.pop(context, true);
   }
 
@@ -55,10 +80,6 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
       if (result != null && result.files.single.path != null) {
         setState(() => _attachedFilePath = result.files.single.path!);
       }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Storage permission denied")),
-      );
     }
   }
 
@@ -70,16 +91,13 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
       if (pickedFile != null) {
         setState(() => _attachedImage = File(pickedFile.path));
       }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Camera permission denied")),
-      );
     }
   }
 
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
+      alignLabelWithHint: true,
       labelStyle: const TextStyle(color: Colors.grey),
       filled: true,
       fillColor: const Color(0xFF1C1C1C),
@@ -89,148 +107,144 @@ class _AddNoteScreenState extends State<AddNoteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: const Text("Add Note", style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: primaryColor),
-          onPressed: () => Navigator.pop(context),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF0F0F0F), Color(0xFF1F2E1E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          onChanged: () => setState(() {}),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextFormField(
-                  controller: _titleController,
-                  maxLength: 100,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _inputDecoration("Title"),
-                  validator: (value) {
-                    if (value == null || value.trim().length < 5) {
-                      return "Title must be at least 5 characters.";
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _contentController,
-                  minLines: 5,
-                  maxLines: null,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _inputDecoration("Content"),
-                  validator: (value) {
-                    if (value == null || value.trim().length < 10) {
-                      return "Content must be at least 10 characters.";
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: _selectedCategory,
-                  dropdownColor: const Color(0xFF1C1C1C),
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _inputDecoration("Select Category"),
-                  items: _categories
-                      .map((cat) => DropdownMenuItem(
-                            value: cat,
-                            child: Text(cat),
-                          ))
-                      .toList(),
-                  onChanged: (value) => setState(() {
-                    _selectedCategory = value;
-                  }),
-                ),
-                const SizedBox(height: 16),
-
-                // Preview Section
-                if (_attachedImage != null)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("Attached Image:",
-                          style: TextStyle(color: Colors.grey)),
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.file(_attachedImage!, height: 150),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Text("Add/Edit Note",
+              style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.black,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: primaryColor),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            onChanged: () => setState(() {}),
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _titleController,
+                    maxLength: 100,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration("Title"),
+                    validator: (value) =>
+                        (value == null || value.trim().length < 5)
+                            ? "Title must be at least 5 characters."
+                            : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _contentController,
+                    minLines: 5,
+                    maxLines: null,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration("Content"),
+                    validator: (value) =>
+                        (value == null || value.trim().length < 10)
+                            ? "Content must be at least 10 characters."
+                            : null,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: _selectedCategory,
+                    dropdownColor: const Color(0xFF1C1C1C),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration("Select Category"),
+                    items: _categories
+                        .map((cat) => DropdownMenuItem(
+                              value: cat,
+                              child: Text(cat),
+                            ))
+                        .toList(),
+                    onChanged: (value) =>
+                        setState(() => _selectedCategory = value),
+                  ),
+                  const SizedBox(height: 16),
+                  if (_attachedImage != null)
+                    Column(
+                      children: [
+                        const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text("Attached Image:",
+                                style: TextStyle(color: Colors.grey))),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(_attachedImage!, height: 150),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                  if (_attachedFilePath != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          "📎 ${_attachedFilePath!.split('/').last}",
+                          style: const TextStyle(color: Colors.grey),
+                        ),
                       ),
-                      const SizedBox(height: 16),
+                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _pickFile,
+                          icon: const Icon(Icons.attach_file),
+                          label: const Text("Attach File"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1C1C1C),
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _pickImage,
+                          icon: const Icon(Icons.camera_alt),
+                          label: const Text("Capture Image"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1C1C1C),
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                if (_attachedFilePath != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Text(
-                      "📎 ${_attachedFilePath!.split('/').last}",
-                      style: const TextStyle(color: Colors.grey),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed:
+                        _formKey.currentState?.validate() == true && !_isSaving
+                            ? _saveNote
+                            : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      minimumSize: const Size.fromHeight(50),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
+                    child: _isSaving
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text("Save Note",
+                            style: TextStyle(fontSize: 16)),
                   ),
-
-                // Attachment Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _pickFile,
-                        icon: const Icon(Icons.attach_file),
-                        label: const Text("Attach File"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1C1C1C),
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(0, 48),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _pickImage,
-                        icon: const Icon(Icons.camera_alt),
-                        label: const Text("Capture Image"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1C1C1C),
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(0, 48),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Save Button
-                ElevatedButton(
-                  onPressed:
-                      _formKey.currentState?.validate() == true && !_isSaving
-                          ? _saveNote
-                          : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    minimumSize: const Size.fromHeight(50),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: _isSaving
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("Save Note", style: TextStyle(fontSize: 16)),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

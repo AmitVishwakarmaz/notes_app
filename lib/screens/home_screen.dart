@@ -17,11 +17,19 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   final Color primaryColor = const Color(0xFF7CBA3B);
+  final List<String> _categories = [
+    'All',
+    'Work',
+    'Personal',
+    'Study',
+    'Others'
+  ];
 
   List<Note> _allNotes = [];
   List<Note> _filteredNotes = [];
 
   String _userName = '';
+  String _selectedCategory = 'All';
 
   @override
   void initState() {
@@ -44,15 +52,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _loadNotes() async {
     _allNotes = await _noteService.loadNotes();
-    _filteredNotes = List.from(_allNotes);
-    setState(() {});
+    _applyAllFilters();
   }
 
   void _applyTextSearch() {
+    _applyAllFilters();
+  }
+
+  void _applyAllFilters() {
     final query = _searchController.text.toLowerCase();
     setState(() {
       _filteredNotes = _allNotes.where((note) {
-        return note.title.toLowerCase().contains(query);
+        final matchesTitle = note.title.toLowerCase().contains(query);
+        final matchesCategory =
+            _selectedCategory == 'All' || note.category == _selectedCategory;
+        return matchesTitle && matchesCategory;
       }).toList();
     });
   }
@@ -109,7 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
 
         setState(() {
-          _filteredNotes = _allNotes.where((note) {
+          _filteredNotes = _filteredNotes.where((note) {
             return note.createdAt.year == selectedDateTime.year &&
                 note.createdAt.month == selectedDateTime.month &&
                 note.createdAt.day == selectedDateTime.day &&
@@ -132,6 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _clearFilters() {
     _searchController.clear();
     setState(() {
+      _selectedCategory = 'All';
       _filteredNotes = List.from(_allNotes);
     });
     ScaffoldMessenger.of(context).showSnackBar(
@@ -142,9 +157,57 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _confirmDelete(Note note) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1C),
+        title: const Text("Delete Note", style: TextStyle(color: Colors.white)),
+        content: const Text(
+          "Are you sure you want to delete this note?",
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _noteService.deleteNote(note.id);
+              _loadNotes();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Note deleted."),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            },
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _logout() async {
     await _authService.signOut();
-    Navigator.pop(context); // or redirect to login
+    Navigator.pop(context);
+  }
+
+  void _toggleStar(Note note) async {
+    note.isStarred = !note.isStarred;
+    await _noteService.updateNote(note);
+    _loadNotes();
+  }
+
+  void _editNote(Note note) async {
+    final updated = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AddNoteScreen(existingNote: note)),
+    );
+    if (updated == true) _loadNotes();
   }
 
   @override
@@ -155,115 +218,193 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Text(
-          "Hey, $_userName 👋",
-          style: const TextStyle(fontSize: 20, color: Colors.white),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF0F0F0F), Color(0xFF1F2E1E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: _logout,
-            tooltip: "Logout",
-          ),
-        ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          title: Text(
+            "Hey, $_userName 👋",
+            style: const TextStyle(fontSize: 20, color: Colors.white),
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout, color: Colors.white),
+              onPressed: _logout,
+              tooltip: "Logout",
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: "Search by title...",
+                            hintStyle: TextStyle(color: Colors.grey[600]),
+                            prefixIcon:
+                                const Icon(Icons.search, color: Colors.grey),
+                            filled: true,
+                            fillColor: const Color(0xFF121212),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.calendar_today,
+                            color: Colors.white),
+                        onPressed: _pickDateTimeFilter,
+                        tooltip: 'Filter by date & time',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.clear, color: Colors.white),
+                        onPressed: _clearFilters,
+                        tooltip: 'Clear filters',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedCategory,
+                    dropdownColor: const Color(0xFF121212),
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      hintText: "Search by title...",
-                      hintStyle: TextStyle(color: Colors.grey[600]),
-                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
                       filled: true,
                       fillColor: const Color(0xFF121212),
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 16),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.calendar_today, color: Colors.white),
-                  onPressed: _pickDateTimeFilter,
-                  tooltip: 'Filter by date & time',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.clear, color: Colors.white),
-                  onPressed: _clearFilters,
-                  tooltip: 'Clear filters',
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: _filteredNotes.isEmpty
-                ? const Center(
-                    child: Text(
-                      "📝 No notes found!",
-                      style: TextStyle(color: Colors.grey, fontSize: 16),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _filteredNotes.length,
-                    itemBuilder: (_, index) {
-                      final note = _filteredNotes[index];
-                      return Card(
-                        color: const Color(0xFF121212),
-                        margin: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        child: ListTile(
-                          title: Text(note.title,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold)),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                note.content.length > 100
-                                    ? note.content.substring(0, 100) + "..."
-                                    : note.content,
-                                style: TextStyle(color: Colors.grey[400]),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                DateFormat('EEE, MMM d • hh:mm a')
-                                    .format(note.createdAt),
-                                style: TextStyle(color: Colors.grey[600]),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
+                    items: _categories
+                        .map((cat) => DropdownMenuItem(
+                              value: cat,
+                              child: Text(cat),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedCategory = value!;
+                        _applyAllFilters();
+                      });
                     },
                   ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: primaryColor,
-        onPressed: () async {
-          final updated = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => AddNoteScreen()),
-          );
-          if (updated == true) _loadNotes();
-        },
-        child: const Icon(Icons.add, color: Colors.white),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _filteredNotes.isEmpty
+                  ? const Center(
+                      child: Text(
+                        "📝 No notes found!",
+                        style: TextStyle(color: Colors.grey, fontSize: 16),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _filteredNotes.length,
+                      itemBuilder: (_, index) {
+                        final note = _filteredNotes[index];
+                        return Card(
+                          color: const Color(0xFF121212),
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          child: ListTile(
+                            title: Text(note.title,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (note.category != null)
+                                  Text(
+                                    note.category!,
+                                    style: const TextStyle(
+                                        color: Colors.greenAccent,
+                                        fontSize: 12),
+                                  ),
+                                Text(
+                                  note.content.length > 100
+                                      ? note.content.substring(0, 100) + "..."
+                                      : note.content,
+                                  style: TextStyle(color: Colors.grey[400]),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  DateFormat('EEE, MMM d • hh:mm a')
+                                      .format(note.createdAt),
+                                  style: TextStyle(color: Colors.grey[600]),
+                                ),
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit,
+                                      color: Colors.lightBlueAccent),
+                                  tooltip: 'Edit Note',
+                                  onPressed: () => _editNote(note),
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    note.isStarred
+                                        ? Icons.star
+                                        : Icons.star_border,
+                                    color: note.isStarred
+                                        ? Colors.yellow
+                                        : Colors.white,
+                                  ),
+                                  tooltip: 'Star Note',
+                                  onPressed: () => _toggleStar(note),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete,
+                                      color: Colors.red),
+                                  tooltip: 'Delete Note',
+                                  onPressed: () => _confirmDelete(note),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          backgroundColor: primaryColor,
+          onPressed: () async {
+            final updated = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => AddNoteScreen()),
+            );
+            if (updated == true) _loadNotes();
+          },
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
       ),
     );
   }

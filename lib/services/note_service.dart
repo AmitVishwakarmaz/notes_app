@@ -17,4 +17,19 @@ class NoteService {
     final data = notes.map((note) => jsonEncode(note.toJson())).toList();
     await prefs.setStringList(notesKey, data);
   }
+
+  Future<void> updateNote(Note updatedNote) async {
+    final notes = await loadNotes();
+    final index = notes.indexWhere((n) => n.id == updatedNote.id);
+    if (index != -1) {
+      notes[index] = updatedNote;
+      await saveNotes(notes);
+    }
+  }
+
+  Future<void> deleteNote(String id) async {
+    final notes = await loadNotes();
+    notes.removeWhere((note) => note.id == id);
+    await saveNotes(notes);
+  }
 }
